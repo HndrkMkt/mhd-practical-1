@@ -13,6 +13,8 @@ void establish_base_line(FILE *fp);
 
 void probe_access_latency(int array_size, int stride, FILE *fp);
 
+double calculate_average_access_latency(struct timespec start, struct timespec end);
+
 void run_experiment() {
     int array_sizes[] = {4 * KB, 8 * KB, 16 * KB,
                          24 * KB, 32 * KB, 48 * KB, // narrow band around 32 KB
@@ -30,7 +32,7 @@ void run_experiment() {
     fp = fopen("access_times_baseline.tsv", "w");
 
     int array_sizes_length = sizeof(array_sizes) / INT_SIZE;
-    fprintf(fp, "Stride\tArray Size\tAccess Time\n");
+    fprintf(fp, "Stride\tArray Size\tAverage Access Latency\n");
     establish_base_line(fp);
     for (int stride_index = 0; stride_index < sizeof(strides) / INT_SIZE; stride_index++) {
         stride = strides[stride_index];
@@ -50,11 +52,9 @@ void establish_base_line(FILE *fp) {
         looping_index = _;
     }
     clock_gettime(CLOCK_REALTIME, &end);
-    double access_time = (end.tv_sec - start.tv_sec) * 1000000000L; // convert seconds to nanoseconds
-    access_time += (end.tv_nsec - start.tv_nsec);
-    double average_access_time = access_time / ITERATIONS;
-    printf("Stride: None\tArray Size: None\tAverage Access Time: %8.5f ns\n", average_access_time);
-    fprintf(fp, "None\tNone\t%f\n", average_access_time);
+    double average_access_latency = calculate_average_access_latency(start, end);
+    printf("Stride: None\tArray Size: None\tAverage Access Latency: %8.5f ns\n", average_access_latency);
+    fprintf(fp, "None\tNone\t%f\n", average_access_latency);
 }
 
 void probe_access_latency(int array_size, int stride, FILE *fp) {
@@ -68,13 +68,17 @@ void probe_access_latency(int array_size, int stride, FILE *fp) {
         looping_index = looping_indices[looping_index];
     }
     clock_gettime(CLOCK_REALTIME, &end);
-    double access_time = (end.tv_sec - start.tv_sec) * 1000000000L; // convert seconds to nanoseconds
-    access_time += (end.tv_nsec - start.tv_nsec);
-    double average_access_time = access_time / ITERATIONS;
-    printf("Stride: %8d\tArray Size: %12d\tAverage Access Time: %8.5f ns\n", stride, array_size,
-           average_access_time);
-    fprintf(fp, "%d\t%d\t%f\n", stride, array_size, average_access_time);
+    double average_access_latency = calculate_average_access_latency(start, end);
+    printf("Stride: %8d\tArray Size: %12d\tAverage Access Latency: %8.5f ns\n", stride, array_size,
+           average_access_latency);
+    fprintf(fp, "%d\t%d\t%f\n", stride, array_size, average_access_latency);
     free(looping_indices);
+}
+
+double calculate_average_access_latency(struct timespec start, struct timespec end) {
+    double total_access_latency = (end.tv_sec - start.tv_sec) * 1000000000L; // convert seconds to nanoseconds
+    total_access_latency += (end.tv_nsec - start.tv_nsec);
+    return total_access_latency / ITERATIONS;
 }
 
 int *init_looping_indices(int array_size, int stride) {
